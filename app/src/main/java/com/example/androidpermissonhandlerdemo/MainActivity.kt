@@ -1,63 +1,44 @@
 package com.example.androidpermissonhandlerdemo
 
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
-import androidx.core.app.ActivityCompat
+import android.view.View
+import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.example.androidpermissonhandlerdemo.API.UserViewModel
-import com.example.androidpermissonhandlerdemo.permision.PermissionUtils
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import com.example.androidpermissonhandlerdemo.permision.showGrantedToast
+import com.example.androidpermissonhandlerdemo.permision.showPermanentlyDeniedDialog
+import com.example.androidpermissonhandlerdemo.permision.showRationaleDialog
+import com.fondesa.kpermissions.PermissionStatus
+import com.fondesa.kpermissions.allGranted
+import com.fondesa.kpermissions.anyPermanentlyDenied
+import com.fondesa.kpermissions.anyShouldShowRationale
+import com.fondesa.kpermissions.extension.permissionsBuilder
+import com.fondesa.kpermissions.request.PermissionRequest
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() ,PermissionRequest.Listener{
     private lateinit var viewModel: UserViewModel
-    private val LOCATION_PERMISSION_REQUEST_CODE = 1
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
-            if (resultCode == RESULT_OK) {
-                // The user has granted the location permissions.
-            } else {
-                // The user has denied the location permissions.
-
-                if (ActivityCompat.shouldShowRequestPermissionRationale(this, PermissionUtils.FINE_LOCATION_PERMISSION) ||
-                    ActivityCompat.shouldShowRequestPermissionRationale(this, PermissionUtils.ACCESS_BACKGROUND_LOCATION_PERMISSION)
-                ) {
-                    // The user has already denied the permissions.
-                    // Explain to the user why you need the permissions
-                    // and ask the user to go to the app settings to grant the permissions.
-                } else {
-                    // The user has denied the permissions and selected the "Don't ask again" checkbox.
-                    // Show a message to the user that they need to grant the permissions in the app settings.
-                }
-            }
-        }
+    //TODO :LOCATION INIT
+    private val request by lazy {
+        permissionsBuilder(android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            .build()
     }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        // Build the request with the permissions you would like to request and send it.
+        request.addListener(this)
 
-        val hasAllPermissions = PermissionUtils.hasLocationPermission(this)
-        Log.e("PERMISSION","$hasAllPermissions ")
-        if (!hasAllPermissions) {
-            var backgroudpermisson=PermissionUtils.hasBackgroundLocationPermission(this)
-            Log.e("PERMISSION BG","$backgroudpermisson ")
-
-            if(!backgroudpermisson){
-                PermissionUtils.requestLocationPermissions(this)
-            }else{
-                Log.e("TAG","Background Permission Granted")
-
-            }
-        }else{
-            Log.e("TAG","location Permission Granted")
+        findViewById<View>(R.id.btn_test_activity_permissions).setOnClickListener {
+            request.send()
         }
+
+
+
         viewModel = ViewModelProvider(this)[UserViewModel::class.java]
         //TODO : FIRST WAY USING FLOW
 
@@ -78,5 +59,13 @@ class MainActivity : ComponentActivity() {
 //            }
 //        }
 
+    }
+
+    override fun onPermissionsResult(result: List<PermissionStatus>) {
+        when {
+            result.anyPermanentlyDenied() -> showPermanentlyDeniedDialog(result)
+            result.anyShouldShowRationale() -> showRationaleDialog(result, request)
+            result.allGranted() -> showGrantedToast(result)
+        }
     }
 }
